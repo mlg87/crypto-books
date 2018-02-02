@@ -1,0 +1,14 @@
+{
+  "name": "crypto-books",
+  "version": "0.1.0",
+  "license": "UNLICENSED",
+  "scripts": {
+    "client": "cd client && yarn start",
+    "server": "cd server && nodemon server.js",
+    "dev": "concurrently --kill-others-on-fail \"yarn server\" \"yarn client\""
+  },
+  "devDependencies": {
+    "concurrently": "^3.5.0"
+  },
+  "dependencies": {}
+}
