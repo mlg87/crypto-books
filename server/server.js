@@ -1,9 +1,9 @@
 const express = require('express')
 const ccxt = require('ccxt')
-// TODO remove pkg
-const queryString = require('query-string')
+// lodash
 const includes = require('lodash').includes
 const intersection = require('lodash').intersection
+const sortBy = require('lodash').sortBy
 
 const app = express()
 const port = process.env.PORT || 5000
@@ -33,6 +33,20 @@ const scrubSymbols = (sharedSymbols, symbols) => {
   }
 }
 
+const combineOrders = (orders) => {
+  let combinedOrders = []
+  Object.keys(orders).forEach((exchange) => {
+    orders[exchange].forEach((order) => {
+      combinedOrders.push({
+        exchange,
+        price: order[0], // [0] === price
+        amount: order[1] // [1] === amount
+      })
+    })
+  })
+  return sortBy(combinedOrders, 'price')
+}
+
 app.get(
   '/api/markets/order-books?:exchanges?:symbol',
   validateExchangeNames,
@@ -40,28 +54,31 @@ app.get(
     const { exchanges, symbol } = req.query
 
     try {
-      const payload = []
+      const asks = {}
+      const bids = {}
       let sharedSymbols = []
 
       await Promise.all(
         exchanges.map(async (exchangeName) => {
           let exchange = new ccxt[exchangeName]()
           await exchange.loadMarkets()
-          const { symbols } = exchange
+          const { id, symbols } = exchange
           const symbolIndex = symbols.indexOf(symbol)
           sharedSymbols = [...scrubSymbols(sharedSymbols, symbols)]
           // fetchOrderBooks return 2d arrays for bid and ask
-          // e.g. 'ETH/USDT' returns asks: [ [ #ETH, #USDT ] ]
-          let orderBook = await exchange.fetchOrderBook(
+          // e.g. 'ETH/USDT' returns asks: [ [ price, amount ] ]
+          const orderBook = await exchange.fetchOrderBook(
             exchange.symbols[symbolIndex]
           )
-          payload.push({
-            id: exchange.id,
-            orderBook
-          })
+          asks[id] = orderBook.asks
+          bids[id] = orderBook.bids
         })
       )
-      res.send({ payload, sharedSymbols })
+      res.send({
+        asks: combineOrders(asks),
+        bids: combineOrders(bids),
+        symbols: sharedSymbols
+      })
     } catch (error) {
       console.error('ERROR:::', error)
       res.send({ error: error })
