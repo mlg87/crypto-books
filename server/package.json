@@ -5,7 +5,8 @@
   "dependencies": {
     "ccxt": "^1.10.967",
     "express": "^4.16.2",
-    "lodash": "^4.17.4"
+    "lodash": "^4.17.4",
+    "query-string": "^5.1.0"
   },
   "devDependencies": {
     "concurrently": "^3.5.0"

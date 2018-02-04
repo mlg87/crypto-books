@@ -1,32 +1,72 @@
 const express = require('express')
 const ccxt = require('ccxt')
+// TODO remove pkg
+const queryString = require('query-string')
 const includes = require('lodash').includes
+const intersection = require('lodash').intersection
 
 const app = express()
 const port = process.env.PORT || 5000
 
-const hasValidExchange = (req, res, next) => {
-  const { exchange_name } = req.params
+const validateExchangeNames = (req, res, next) => {
+  const { exchanges } = req.query
 
-  if (!exchange_name) {
-    res.send({ error: 'Must provide exchange name' })
-  } else if (!includes(ccxt.exchanges, exchange_name)) {
-    res.send({ error: `${exchange_name} is not a valid exchange name` })
+  const hasValidExchanges = () => {
+    return exchanges.every((exchange) => includes(ccxt.exchanges, exchange))
+  }
+
+  if (!exchanges || !exchanges.length) {
+    res.send({ error: 'Must provide at least one exchange name' })
+  } else if (!hasValidExchanges()) {
+    res.send({ error: 'Invalid exchange name(s) provided' })
   } else {
     next()
   }
 }
 
-app.get('/api/markets/:exchange_name', hasValidExchange, async (req, res) => {
-  const { exchange_name } = req.params
-
-  try {
-    const xchg = new ccxt[exchange_name]()
-    await xchg.loadMarkets()
-    res.send({ exchange_name: xchg.id, exchange_order_books: xchg })
-  } catch (error) {
-    res.send({ error })
+// make sure to only return symbols shared by all exchanges
+const scrubSymbols = (sharedSymbols, symbols) => {
+  if (!sharedSymbols.length) {
+    return [...symbols]
+  } else {
+    return intersection(sharedSymbols, symbols)
   }
-})
+}
+
+app.get(
+  '/api/markets/order-books?:exchanges?:symbol',
+  validateExchangeNames,
+  async (req, res) => {
+    const { exchanges, symbol } = req.query
+
+    try {
+      const payload = []
+      let sharedSymbols = []
+
+      await Promise.all(
+        exchanges.map(async (exchangeName) => {
+          let exchange = new ccxt[exchangeName]()
+          await exchange.loadMarkets()
+          const { symbols } = exchange
+          const symbolIndex = symbols.indexOf(symbol)
+          sharedSymbols = [...scrubSymbols(sharedSymbols, symbols)]
+          // fetchOrderBooks return 2d arrays for bid and ask
+          // e.g. 'ETH/USDT' returns asks: [ [ #ETH, #USDT ] ]
+          let orderBook = await exchange.fetchOrderBook(
+            exchange.symbols[symbolIndex]
+          )
+          payload.push({
+            id: exchange.id,
+            orderBook
+          })
+        })
+      )
+      res.send({ payload, sharedSymbols })
+    } catch (error) {
+      console.error('ERROR:::', error)
+      res.send({ error: error })
+    }
+  }
+)
 
 app.listen(port, () => console.log(`Listening on port ${port}`))
