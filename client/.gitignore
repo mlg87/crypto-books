@@ -6,8 +6,8 @@
 # testing
 /coverage
 
-# production
-/build
+# production (removed bc heroku-postbuild was not creating build dir in /client)
+# /build
 
 # misc
 .DS_Store
