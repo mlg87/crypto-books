@@ -2,11 +2,17 @@
   "name": "crypto-books",
   "version": "0.1.0",
   "license": "UNLICENSED",
+  "engines": {
+    "node": "8.9.4"
+  },
   "scripts": {
     "client": "cd client && yarn start",
-    "server": "cd server && nodemon server.js",
-    "dev": "concurrently --kill-others-on-fail \"yarn server\" \"yarn client\"",
-    "start": "yarn server && yarn client"
+    "server": "cd server && yarn start",
+    "server-dev": "cd server && yarn dev",
+    "dev":
+      "concurrently --kill-others-on-fail \"yarn server-dev\" \"yarn client\"",
+    "start": "yarn server && yarn client",
+    "postinstall": "cd client && yarn build"
   },
   "devDependencies": {
     "concurrently": "^3.5.0",
