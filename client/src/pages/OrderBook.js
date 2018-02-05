@@ -1,4 +1,6 @@
 import React, { Component } from 'react'
+// mobx
+import { inject, observer } from 'mobx-react'
 // mui
 import Button from 'material-ui/Button'
 import CircularProgress from 'material-ui/Progress/CircularProgress'
@@ -9,69 +11,85 @@ import MenuItem from 'material-ui/Menu/MenuItem'
 import Sync from 'material-ui-icons/Sync'
 import TextField from 'material-ui/TextField'
 import Typography from 'material-ui/Typography'
-import Table, {
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow
-} from 'material-ui/Table'
 // lodash
 import includes from 'lodash/includes'
 import upperFirst from 'lodash/upperFirst'
+import sortBy from 'lodash/sortBy'
 import slice from 'lodash/slice'
+import uniq from 'lodash/uniq'
+// moment
+import moment from 'moment'
 
-export default class OrderBook extends Component {
+import { subscribeToMarketUpdates, subscribeToExchangeInfo } from '../api'
+import { OrderTable } from '../components/OrderTable'
+
+class OrderBook extends Component {
   state = {
-    isLoading: true,
-    // TODO move this to mobx
-    selectedSymbol: 'ETH/BTC',
-    selectedExchanges: ['bittrex', 'poloniex'],
-    bids: [],
     asks: [],
+    bids: [],
+    currentMarket: null,
+    exchanges: [],
+    isLoading: true,
+    isUpdatingTable: true,
+    // default per project specs
+    selectedExchanges: ['bittrex', 'poloniex'],
+    selectedSymbol: 'ETH/BTC',
     symbols: []
   }
 
-  // could be dynamically set by server
-  exchanges = [
-    'binance',
-    'bitfinex',
-    'bithumb',
-    'bittrex',
-    'exmo',
-    'gdax',
-    'gemini',
-    'hitbtc',
-    'huobi',
-    'kraken',
-    'okex',
-    'poloniex'
-  ]
-
   componentWillMount() {
+    this.getExchangeInfo()
     this.getMarkets()
   }
 
-  getMarkets = async () => {
-    const { selectedExchanges, selectedSymbol } = this.state
-    let exchangesQuery = ''
-    selectedExchanges.map(
-      (exchange, i) =>
-        (exchangesQuery += `exchanges=${exchange}${
-          selectedExchanges.length - 1 === i ? '' : '&'
-        }`)
-    )
+  getExchangeInfo() {
+    subscribeToExchangeInfo((error, { exchanges }) => {
+      if (!exchanges) {
+        this.setState({ isError: true })
+        return
+      }
 
-    const res = await fetch(
-      `/api/markets/order-books?${exchangesQuery}&symbol=${selectedSymbol}`
-    )
-    const { asks, bids, symbols } = await res.json()
+      const exchangesArr = []
+      let symbolsArr = []
 
-    this.setState({
-      symbols,
-      asks,
-      bids,
-      isLoading: false
+      Object.keys(exchanges).map((exchangeName) => {
+        // keep track of which symbols each exchange has
+        exchangesArr.push({
+          name: exchangeName,
+          symbols: exchanges[exchangeName]
+        })
+        symbolsArr = [...symbolsArr, ...exchanges[exchangeName]]
+      })
+
+      this.setState({
+        exchanges: sortBy(exchangesArr, 'name'),
+        symbols: uniq(symbolsArr).sort()
+      })
     })
+  }
+
+  // TODO remove symbols from socket publication
+  getMarkets() {
+    const { selectedExchanges, selectedSymbol } = this.state
+    subscribeToMarketUpdates(
+      selectedExchanges,
+      selectedSymbol,
+      (error, { asks, bids, symbol, timestamp }) => {
+        if (!asks || !bids || !symbol || !timestamp) {
+          this.setState({ isError: true })
+          return
+        }
+
+        this.setState({
+          asks,
+          bids,
+          currentMarket: symbol,
+          lastUpdated: timestamp,
+          isLoading: false,
+          isUpdatingTable: false
+        })
+      }
+    )
   }
 
   _handleExchangeSelection = (exchange) => {
@@ -93,31 +111,54 @@ export default class OrderBook extends Component {
 
   _handleSymbolSelection = (event) => {
     this.setState({
-      selectedSymbol: event.target.value
+      selectedSymbol: event.target.value,
+      // reset exchanges so only those with the new symbol can be
+      // selected
+      selectedExchanges: []
     })
   }
 
   _handleSync = () => {
-    this.setState({ isLoading: true })
+    this.setState({ isUpdatingTable: true })
     this.getMarkets()
+  }
+
+  exchangeHasSymbol = (exchangeName) => {
+    const { exchanges, selectedSymbol } = this.state
+    console.log('exchanges', exchanges)
+    return includes(exchanges[exchangeName], selectedSymbol)
   }
 
   render() {
     const {
       asks,
       bids,
+      currentMarket,
+      exchanges,
+      isError,
       isLoading,
+      isUpdatingTable,
+      lastUpdated,
       symbols,
       selectedSymbol,
       selectedExchanges
     } = this.state
 
-    console.log('this.context', this.context)
-
     return isLoading ? (
       <div style={styles.loading.container}>
         <CircularProgress style={styles.loading.indicator} />
+        <Typography style={styles.loading.description}>
+          Hang tight, getting you that sweet, sweet market data...
+        </Typography>
       </div>
+    ) : isError ? (
+      <Grid container style={styles.root}>
+        <Grid item xs={12}>
+          <Typography>
+            Well this is embarassing. We appear to have encountered an error...
+          </Typography>
+        </Grid>
+      </Grid>
     ) : (
       <Grid container style={styles.root}>
         <Grid item xs={12}>
@@ -125,18 +166,18 @@ export default class OrderBook extends Component {
             <Grid item xs={6}>
               <FormControl>
                 <FormGroup row>
-                  {this.exchanges.map((exchange) => (
+                  {exchanges.map(({ name, symbols }) => (
                     <FormControlLabel
+                      key={`exchange-label-${name}`}
                       control={
                         <Checkbox
-                          checked={includes(selectedExchanges, exchange)}
-                          onChange={() =>
-                            this._handleExchangeSelection(exchange)
-                          }
-                          value={exchange}
+                          checked={includes(selectedExchanges, name)}
+                          onChange={() => this._handleExchangeSelection(name)}
+                          value={name}
                         />
                       }
-                      label={upperFirst(exchange)}
+                      label={upperFirst(name)}
+                      disabled={!includes(symbols, selectedSymbol)}
                     />
                   ))}
                 </FormGroup>
@@ -177,65 +218,34 @@ export default class OrderBook extends Component {
           </Button>
         </Grid>
         <Grid item xs={6}>
-          <Typography align="center" gutterBottom type="display1">
-            Bids
-          </Typography>
-          <div style={styles.table.container}>
-            <Table style={styles.table.bids}>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Exchange</TableCell>
-                  <TableCell numeric>Price</TableCell>
-                  <TableCell numeric>Amount</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {bids.map((bid, i) => {
-                  const { amount, exchange, price } = bid
-                  return (
-                    <TableRow key={`bid${i}`}>
-                      <TableCell>{upperFirst(exchange)}</TableCell>
-                      <TableCell numeric>{price}</TableCell>
-                      <TableCell numeric>{amount}</TableCell>
-                    </TableRow>
-                  )
-                })}
-              </TableBody>
-            </Table>
-          </div>
+          <OrderTable
+            title="Bids"
+            currentMarket={currentMarket}
+            data={bids}
+            isUpdatingTable={isUpdatingTable}
+          />
         </Grid>
         <Grid item xs={6}>
-          <Typography align="center" gutterBottom type="display1">
-            Asks
+          <OrderTable
+            title="Asks"
+            currentMarket={currentMarket}
+            data={asks}
+            isUpdatingTable={isUpdatingTable}
+          />
+        </Grid>
+        <Grid xs={12} style={styles.lastUpdated}>
+          <Typography type="caption" align="right">
+            {`Last Updated: ${moment(lastUpdated).format(
+              'MM/DD/YYYY @ kk:mm:ss ZZ'
+            )}`}
           </Typography>
-          <div style={styles.table.container}>
-            <Table style={styles.table.asks}>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Exchange</TableCell>
-                  <TableCell numeric>Price</TableCell>
-                  <TableCell numeric>Amount</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {asks.map((ask, i) => {
-                  const { amount, exchange, price } = ask
-                  return (
-                    <TableRow key={`ask${i}`}>
-                      <TableCell>{upperFirst(exchange)}</TableCell>
-                      <TableCell numeric>{price}</TableCell>
-                      <TableCell numeric>{amount}</TableCell>
-                    </TableRow>
-                  )
-                })}
-              </TableBody>
-            </Table>
-          </div>
         </Grid>
       </Grid>
     )
   }
 }
+
+export default inject('Exchanges')(observer(OrderBook))
 
 const styles = {
   root: {
@@ -246,6 +256,7 @@ const styles = {
   loading: {
     container: {
       display: 'flex',
+      flexDirection: 'column',
       justifyContent: 'center',
       alignItems: 'center',
       position: 'absolute',
@@ -253,6 +264,9 @@ const styles = {
       right: 0,
       bottom: 0,
       left: 0
+    },
+    description: {
+      marginTop: '20px'
     },
     indicator: {
       color: '#fff'
@@ -264,12 +278,7 @@ const styles = {
       flexWrap: 'wrap'
     }
   },
-  table: {
-    container: {
-      maxHeight: '800px',
-      overflow: 'scroll'
-    },
-    asks: {},
-    bids: {}
+  lastUpdated: {
+    marginTop: '20px'
   }
 }
