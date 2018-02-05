@@ -12,7 +12,7 @@
     "dev":
       "concurrently --kill-others-on-fail \"yarn server-dev\" \"yarn client\"",
     "start": "yarn server && yarn client",
-    "postinstall": "cd client && yarn && yarn build"
+    "postinstall": "cd client && yarn install --production=false && yarn build"
   },
   "devDependencies": {
     "concurrently": "^3.5.0",
