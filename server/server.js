@@ -4,6 +4,10 @@ const app = express()
 const server = require('http').createServer(app)
 const io = require('socket.io')(server)
 
+const path = require('path')
+
+app.use('/', express.static(`${__dirname}/client/build`))
+
 const port = process.env.PORT || 5000
 // exchange info pkg
 const ccxt = require('ccxt')
@@ -134,5 +138,5 @@ io.on('connection', (client) => {
   })
 })
 
-io.listen(port)
+server.listen(port)
 console.log(`Listening on port ${port}`)

@@ -1,6 +1,4 @@
 import React, { Component } from 'react'
-// mobx
-import { inject, observer } from 'mobx-react'
 // mui
 import Button from 'material-ui/Button'
 import CircularProgress from 'material-ui/Progress/CircularProgress'
@@ -23,7 +21,7 @@ import moment from 'moment'
 import { subscribeToMarketUpdates, subscribeToExchangeInfo } from '../api'
 import { OrderTable } from '../components/OrderTable'
 
-class OrderBook extends Component {
+export default class OrderBook extends Component {
   state = {
     asks: [],
     bids: [],
@@ -244,8 +242,6 @@ class OrderBook extends Component {
     )
   }
 }
-
-export default inject('Exchanges')(observer(OrderBook))
 
 const styles = {
   root: {
