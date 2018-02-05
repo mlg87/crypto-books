@@ -6,10 +6,10 @@ const io = require('socket.io')(server)
 
 const path = require('path')
 
-app.use(express.static(`${__dirname}/../client/build`))
+app.use(express.static(path.join(__dirname, '/../client/build')))
 
 app.get('/', (req, res) => {
-  res.sendFile(`${__dirname}/../client/build/index.html`)
+  res.sendFile(path.join(__dirname, '/../client/build/index.html'))
 })
 
 const port = process.env.PORT || 5000
