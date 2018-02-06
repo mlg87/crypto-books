@@ -18,7 +18,6 @@ import uniq from 'lodash/uniq'
 // moment
 import moment from 'moment'
 
-import { subscribeToMarketUpdates, subscribeToExchangeInfo } from '../api'
 import { OrderTable } from '../components/OrderTable'
 
 export default class OrderBook extends Component {
@@ -36,58 +35,63 @@ export default class OrderBook extends Component {
   }
 
   componentWillMount() {
-    this.getExchangeInfo()
-    this.getMarkets()
-  }
-
-  getExchangeInfo() {
-    subscribeToExchangeInfo((error, { exchanges }) => {
-      if (!exchanges) {
-        this.setState({ isError: true })
-        return
+    this.socket = new WebSocket('ws://localhost:5000')
+    this.socket.addEventListener('message', (event) => {
+      const { type, data } = JSON.parse(event.data)
+      switch (type) {
+        case 'exchangeInfo':
+          this.handleExchangeInfo(data)
+          break
+        case 'orderInfo':
+          this.handleOrderInfo(data)
+        default:
+          break
       }
-
-      const exchangesArr = []
-      let symbolsArr = []
-
-      Object.keys(exchanges).map((exchangeName) => {
-        // keep track of which symbols each exchange has
-        exchangesArr.push({
-          name: exchangeName,
-          symbols: exchanges[exchangeName]
-        })
-        symbolsArr = [...symbolsArr, ...exchanges[exchangeName]]
-      })
-
-      this.setState({
-        exchanges: sortBy(exchangesArr, 'name'),
-        symbols: uniq(symbolsArr).sort()
-      })
     })
   }
 
-  // TODO remove symbols from socket publication
-  getMarkets() {
-    const { selectedExchanges, selectedSymbol } = this.state
-    subscribeToMarketUpdates(
-      selectedExchanges,
-      selectedSymbol,
-      (error, { asks, bids, symbol, timestamp }) => {
-        if (!asks || !bids || !symbol || !timestamp) {
-          this.setState({ isError: true })
-          return
-        }
+  componentWillUnmount() {
+    this.socket.close()
+  }
 
-        this.setState({
-          asks,
-          bids,
-          currentMarket: symbol,
-          lastUpdated: timestamp,
-          isLoading: false,
-          isUpdatingTable: false
-        })
-      }
-    )
+  handleExchangeInfo({ exchanges }) {
+    if (!exchanges) {
+      this.setState({ isError: true })
+      return
+    }
+
+    const exchangesArr = []
+    let symbolsArr = []
+
+    Object.keys(exchanges).map((exchangeName) => {
+      // keep track of which symbols each exchange has
+      exchangesArr.push({
+        name: exchangeName,
+        symbols: exchanges[exchangeName]
+      })
+      symbolsArr = [...symbolsArr, ...exchanges[exchangeName]]
+    })
+
+    this.setState({
+      exchanges: sortBy(exchangesArr, 'name'),
+      symbols: uniq(symbolsArr).sort()
+    })
+  }
+
+  handleOrderInfo({ asks, bids, symbol, timestamp }) {
+    if (!asks || !bids || !symbol || !timestamp) {
+      this.setState({ isError: true })
+      return
+    }
+
+    this.setState({
+      asks,
+      bids,
+      currentMarket: symbol,
+      lastUpdated: timestamp,
+      isLoading: false,
+      isUpdatingTable: false
+    })
   }
 
   _handleExchangeSelection = (exchange) => {
@@ -117,8 +121,14 @@ export default class OrderBook extends Component {
   }
 
   _handleSync = () => {
+    const { selectedExchanges, selectedSymbol } = this.state
+    this.socket.send(
+      JSON.stringify({
+        type: 'updateOrderBook',
+        data: { exchanges: selectedExchanges, symbol: selectedSymbol }
+      })
+    )
     this.setState({ isUpdatingTable: true })
-    this.getMarkets()
   }
 
   exchangeHasSymbol = (exchangeName) => {
@@ -215,28 +225,30 @@ export default class OrderBook extends Component {
             <Sync />
           </Button>
         </Grid>
-        <Grid item xs={6}>
-          <OrderTable
-            title="Bids"
-            currentMarket={currentMarket}
-            data={bids}
-            isUpdatingTable={isUpdatingTable}
-          />
-        </Grid>
-        <Grid item xs={6}>
-          <OrderTable
-            title="Asks"
-            currentMarket={currentMarket}
-            data={asks}
-            isUpdatingTable={isUpdatingTable}
-          />
-        </Grid>
-        <Grid xs={12} style={styles.lastUpdated}>
+        <Grid item xs={12}>
           <Typography type="caption" align="right">
             {`Last Updated: ${moment(lastUpdated).format(
               'MM/DD/YYYY @ kk:mm:ss ZZ'
             )}`}
           </Typography>
+        </Grid>
+        <Grid item xs={6}>
+          <OrderTable
+            type="bids"
+            currentMarket={currentMarket}
+            data={bids}
+            pointOfComparison={asks[0].price}
+            isUpdatingTable={isUpdatingTable}
+          />
+        </Grid>
+        <Grid item xs={6}>
+          <OrderTable
+            type="asks"
+            currentMarket={currentMarket}
+            data={asks}
+            pointOfComparison={bids[0].price}
+            isUpdatingTable={isUpdatingTable}
+          />
         </Grid>
       </Grid>
     )
@@ -273,8 +285,5 @@ const styles = {
       display: 'flex',
       flexWrap: 'wrap'
     }
-  },
-  lastUpdated: {
-    marginTop: '20px'
   }
 }

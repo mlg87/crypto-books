@@ -8,17 +8,27 @@ import Table, {
   TableHead,
   TableRow
 } from 'material-ui/Table'
+import green from 'material-ui/colors/green'
 // lodash
 import upperFirst from 'lodash/upperFirst'
 
 export class OrderTable extends Component {
+  isOverlapped(price) {
+    const { pointOfComparison, type } = this.props
+    const actions = {
+      asks: () => price < pointOfComparison,
+      bids: () => price > pointOfComparison
+    }
+    return actions[type] ? actions[type]() : false
+  }
+
   render() {
-    const { currentMarket, data, isUpdatingTable, title } = this.props
+    const { currentMarket, data, isUpdatingTable, type } = this.props
 
     return (
       <div>
         <Typography align="center" gutterBottom type="display1">
-          {title}
+          {upperFirst(type)}
         </Typography>
         {isUpdatingTable ? (
           <div style={styles.loading.container}>
@@ -38,7 +48,12 @@ export class OrderTable extends Component {
                 {data.map((order, i) => {
                   const { amount, exchange, price } = order
                   return (
-                    <TableRow key={`title${i}`}>
+                    <TableRow
+                      key={`title${i}`}
+                      style={
+                        this.isOverlapped(price) ? styles.table.overlap : null
+                      }
+                    >
                       <TableCell>{upperFirst(exchange)}</TableCell>
                       <TableCell numeric>{price}</TableCell>
                       <TableCell numeric>{amount}</TableCell>
@@ -59,6 +74,9 @@ const styles = {
     container: {
       maxHeight: '800px',
       overflow: 'scroll'
+    },
+    overlap: {
+      backgroundColor: green[500]
     }
   },
   loading: {

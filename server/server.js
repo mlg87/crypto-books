@@ -2,29 +2,27 @@
 const express = require('express')
 const app = express()
 const server = require('http').createServer(app)
-const io = require('socket.io')(server)
-
+const WebSocket = require('ws')
+const wss = new WebSocket.Server({ server })
 const path = require('path')
+// exchange info pkg
+const ccxt = require('ccxt')
+// lodash
+const {
+  includes,
+  intersection,
+  findIndex,
+  orderBy,
+  sortBy,
+  slice
+} = require('lodash')
+const port = process.env.PORT || 5000
 
 app.use(express.static(path.join(__dirname, '/../client/build')))
 
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '/../client/build/index.html'))
 })
-
-const port = process.env.PORT || 5000
-// exchange info pkg
-const ccxt = require('ccxt')
-// lodash
-const { includes, intersection, findIndex, sortBy, slice } = require('lodash')
-
-// make sure to only return symbols shared by all exchanges requested
-const scrubSymbols = (sharedSymbols, symbols) => {
-  if (!sharedSymbols.length) {
-    return [...symbols]
-  }
-  return intersection(sharedSymbols, symbols)
-}
 
 const combineOrders = (orders) => {
   const combinedOrders = []
@@ -37,7 +35,7 @@ const combineOrders = (orders) => {
       })
     })
   })
-  return sortBy(combinedOrders, 'price')
+  return combinedOrders
 }
 
 const getExchangeInfoAsync = async () => {
@@ -50,7 +48,7 @@ const getExchangeInfoAsync = async () => {
     'gdax',
     'gemini',
     'hitbtc',
-    'huobi',
+    // 'huobi',
     'kraken',
     'okex',
     'poloniex'
@@ -76,7 +74,10 @@ const getExchangeInfoAsync = async () => {
   }
 }
 
-const getMarketDataAsync = async (exchanges, symbol) => {
+const getOrderBookAsync = async (
+  exchanges = ['bittrex', 'poloniex'],
+  symbol = 'ETH/BTC'
+) => {
   try {
     const asks = {}
     const bids = {}
@@ -98,8 +99,8 @@ const getMarketDataAsync = async (exchanges, symbol) => {
     )
     return {
       timestamp: new Date(),
-      asks: combineOrders(asks),
-      bids: combineOrders(bids),
+      asks: orderBy(combineOrders(asks), 'price', 'asc'),
+      bids: orderBy(combineOrders(bids), 'price', 'desc'),
       symbol
     }
   } catch (error) {
@@ -108,38 +109,57 @@ const getMarketDataAsync = async (exchanges, symbol) => {
   }
 }
 
-let clients = []
-io.on('connection', (client) => {
-  clients.push(client)
-
-  // event cbs /////////////////////////////////////////////////////
-  const subscribeToExchangeInfo = async () => {
-    client.emit('exchangeInfo', await getExchangeInfoAsync())
-  }
-
-  let marketDataInterval // store interval so same event can handle initial subs and resubs
-  const subscribeToMarketUpdates = async (exchanges, symbol) => {
-    if (marketDataInterval) clearInterval(marketDataInterval)
-
-    // send initial response
-    client.emit('marketUpdate', await getMarketDataAsync(exchanges, symbol))
-
-    // update client every 10 seconds
-    marketDataInterval = setInterval(async () => {
-      client.emit('marketUpdate', await getMarketDataAsync(exchanges, symbol))
-    }, 10000)
-  }
-  ///////////////////////////////////////////////////////////////////
-
-  client.on('subscribeToMarketUpdates', subscribeToMarketUpdates)
-
-  client.on('subscribeToExchangeInfo', subscribeToExchangeInfo)
-
-  client.on('disconnect', () => {
-    const index = findIndex(clients, (c) => c.id === client.id)
-    // get rid of client on disconnect
-    clients = [...slice(clients, 0, index), ...slice(clients, index + 1)]
+const sendMessageToClient = (ws, type, data) => {
+  ws.send(JSON.stringify({ type, data }), (error) => {
+    if (error) console.log(`::: ERROR SENDING ${type} :::`, error)
   })
+}
+
+wss.on('connection', async (ws, req) => {
+  console.log('::: CLIENT CONNECTED :::')
+  let orderBookInterval
+
+  // send exchange and market info on initial connection
+  const exchanges = await getExchangeInfoAsync()
+  const initalOrderBook = await getOrderBookAsync()
+  sendMessageToClient(ws, 'exchangeInfo', exchanges)
+  sendMessageToClient(ws, 'orderInfo', initalOrderBook)
+
+  orderBookInterval = setInterval(async () => {
+    const orderBook = await getOrderBookAsync()
+    sendMessageToClient(ws, 'orderInfo', orderBook)
+  }, 10000)
+
+  ws.on('message', async (message) => {
+    const { type, data } = JSON.parse(message)
+
+    switch (type) {
+      case 'updateOrderBook':
+        // should be true
+        if (orderBookInterval) clearInterval(orderBookInterval)
+        const { exchanges, symbol } = data
+
+        // TODO handle bitfinex rate limit
+
+        orderBookInterval = setInterval(async () => {
+          const orderBook = await getOrderBookAsync(exchanges, symbol)
+          sendMessageToClient(ws, 'orderInfo', orderBook)
+        }, 10000) // per ccxt, no rate limit is lower than 3000
+        break
+
+      default:
+        break
+    }
+  })
+})
+
+wss.on('message', (data) => {
+  const message = JSON.parse(data)
+  console.log('::: MESSAGE :::', message)
+})
+
+wss.on('error', (error) => {
+  console.log('::: ERROR :::', error)
 })
 
 server.listen(port)
