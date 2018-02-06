@@ -35,7 +35,7 @@ export default class OrderBook extends Component {
   }
 
   componentWillMount() {
-    this.socket = new WebSocket('ws://localhost:5000')
+    this.socket = new WebSocket('ws://crypto-books.herokuapp.com/')
     this.socket.addEventListener('message', (event) => {
       const { type, data } = JSON.parse(event.data)
       switch (type) {
@@ -44,6 +44,7 @@ export default class OrderBook extends Component {
           break
         case 'orderInfo':
           this.handleOrderInfo(data)
+          break
         default:
           break
       }

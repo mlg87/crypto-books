@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "license": "UNLICENSED",
   "private": true,
+  "homepage": "https://crypto-books.herokuapp.com/",
   "proxy": {
     "/socket": {
       "target": "ws://localhost:5000",
