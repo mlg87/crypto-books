@@ -7,10 +7,12 @@
   },
   "scripts": {
     "client": "cd client && yarn start",
+    "client-dev":
+      "cd client && REACT_APP_WS_ENDPOINT=localhost:5000 yarn start",
     "server": "cd server && yarn start",
     "server-dev": "cd server && yarn dev",
     "dev":
-      "concurrently --kill-others-on-fail \"yarn server-dev\" \"yarn client\"",
+      "concurrently --kill-others-on-fail \"yarn server-dev\" \"REACT_APP_WS_ENDPOINT=localhost:5000 yarn client\"",
     "start": "yarn server && yarn client",
     "heroku-postbuild":
       "cd client && yarn install --production=false && yarn build"
@@ -21,7 +23,8 @@
     "eslint-config-airbnb": "^16.1.0",
     "eslint-plugin-import": "^2.8.0",
     "eslint-plugin-jsx-a11y": "^6.0.3",
-    "eslint-plugin-react": "^7.6.1"
+    "eslint-plugin-react": "^7.6.1",
+    "mock-socket": "^7.1.0"
   },
   "dependencies": {}
 }

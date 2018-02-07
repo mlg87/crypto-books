@@ -1,0 +1,56 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`OrderBook renders correctly 1`] = `
+<div
+  style={
+    Object {
+      "alignItems": "center",
+      "bottom": 0,
+      "display": "flex",
+      "flexDirection": "column",
+      "justifyContent": "center",
+      "left": 0,
+      "position": "absolute",
+      "right": 0,
+      "top": 0,
+    }
+  }
+>
+  <div
+    className="MuiCircularProgress-root-1 MuiCircularProgress-colorPrimary-2"
+    role="progressbar"
+    style={
+      Object {
+        "color": "#fff",
+        "height": 40,
+        "width": 40,
+      }
+    }
+  >
+    <svg
+      className="MuiCircularProgress-svgIndeterminate-4"
+      viewBox="0 0 50 50"
+    >
+      <circle
+        className="MuiCircularProgress-circle-6 MuiCircularProgress-circleIndeterminate-7"
+        cx={25}
+        cy={25}
+        fill="none"
+        r={20}
+        strokeWidth={3.6}
+        style={Object {}}
+      />
+    </svg>
+  </div>
+  <p
+    className="MuiTypography-root-8 MuiTypography-body1-17"
+    style={
+      Object {
+        "marginTop": "20px",
+      }
+    }
+  >
+    Hang tight, getting you that sweet, sweet market data...
+  </p>
+</div>
+`;

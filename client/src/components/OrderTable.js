@@ -1,4 +1,5 @@
 import React, { Component } from 'react'
+import PropTypes from 'prop-types'
 // mui
 import CircularProgress from 'material-ui/Progress/CircularProgress'
 import Typography from 'material-ui/Typography'
@@ -12,7 +13,23 @@ import green from 'material-ui/colors/green'
 // lodash
 import upperFirst from 'lodash/upperFirst'
 
-export class OrderTable extends Component {
+export default class OrderTable extends Component {
+  static propTypes = {
+    currentMarket: PropTypes.string.isRequired,
+    data: PropTypes.array.isRequired,
+    denseCells: PropTypes.bool,
+    showTitle: PropTypes.bool,
+    isUpdatingTable: PropTypes.bool,
+    pointOfComparison: PropTypes.number.isRequired,
+    type: PropTypes.string.isRequired
+  }
+
+  static defaultProps = {
+    denseCells: false,
+    showTitle: false,
+    isUpdatingTable: true
+  }
+
   isOverlapped(price) {
     const { pointOfComparison, type } = this.props
     const actions = {
@@ -23,13 +40,22 @@ export class OrderTable extends Component {
   }
 
   render() {
-    const { currentMarket, data, isUpdatingTable, type } = this.props
+    const {
+      currentMarket,
+      data,
+      denseCells,
+      showTitle,
+      isUpdatingTable,
+      type
+    } = this.props
 
     return (
       <div>
-        <Typography align="center" gutterBottom type="display1">
-          {upperFirst(type)}
-        </Typography>
+        {showTitle && (
+          <Typography align="center" gutterBottom type="display1">
+            {upperFirst(type)}
+          </Typography>
+        )}
         {isUpdatingTable ? (
           <div style={styles.loading.container}>
             <CircularProgress style={styles.loading.indicator} />
@@ -39,9 +65,16 @@ export class OrderTable extends Component {
             <Table>
               <TableHead>
                 <TableRow>
-                  <TableCell>Exchange</TableCell>
-                  <TableCell numeric>{`Price (${currentMarket})`}</TableCell>
-                  <TableCell numeric>Amount</TableCell>
+                  <TableCell padding={denseCells ? 'dense' : 'default'}>
+                    Exchange
+                  </TableCell>
+                  <TableCell
+                    numeric
+                    padding={denseCells ? 'dense' : 'default'}
+                  >{`Price (${currentMarket})`}</TableCell>
+                  <TableCell numeric padding={denseCells ? 'dense' : 'default'}>
+                    Amount
+                  </TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -54,9 +87,21 @@ export class OrderTable extends Component {
                         this.isOverlapped(price) ? styles.table.overlap : null
                       }
                     >
-                      <TableCell>{upperFirst(exchange)}</TableCell>
-                      <TableCell numeric>{price}</TableCell>
-                      <TableCell numeric>{amount}</TableCell>
+                      <TableCell padding={denseCells ? 'dense' : 'default'}>
+                        {upperFirst(exchange)}
+                      </TableCell>
+                      <TableCell
+                        numeric
+                        padding={denseCells ? 'dense' : 'default'}
+                      >
+                        {price}
+                      </TableCell>
+                      <TableCell
+                        numeric
+                        padding={denseCells ? 'dense' : 'default'}
+                      >
+                        {amount}
+                      </TableCell>
                     </TableRow>
                   )
                 })}
@@ -84,7 +129,8 @@ const styles = {
       display: 'flex',
       flexDirection: 'column',
       justifyContent: 'center',
-      alignItems: 'center'
+      alignItems: 'center',
+      marginTop: '40px'
     },
     indicator: {
       color: '#fff'

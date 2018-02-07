@@ -1,0 +1,44 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`OrderTable renders correctly 1`] = `
+<div>
+  <div
+    style={
+      Object {
+        "alignItems": "center",
+        "display": "flex",
+        "flexDirection": "column",
+        "justifyContent": "center",
+        "marginTop": "40px",
+      }
+    }
+  >
+    <div
+      className="MuiCircularProgress-root-1 MuiCircularProgress-colorPrimary-2"
+      role="progressbar"
+      style={
+        Object {
+          "color": "#fff",
+          "height": 40,
+          "width": 40,
+        }
+      }
+    >
+      <svg
+        className="MuiCircularProgress-svgIndeterminate-4"
+        viewBox="0 0 50 50"
+      >
+        <circle
+          className="MuiCircularProgress-circle-6 MuiCircularProgress-circleIndeterminate-7"
+          cx={25}
+          cy={25}
+          fill="none"
+          r={20}
+          strokeWidth={3.6}
+          style={Object {}}
+        />
+      </svg>
+    </div>
+  </div>
+</div>
+`;
