@@ -42,7 +42,7 @@ const getExchangeInfoAsync = async () => {
   const popularExchanges = [
     'binance',
     'bitfinex',
-    'bithumb',
+    // 'bithumb',
     'bittrex',
     'exmo',
     'gdax',
